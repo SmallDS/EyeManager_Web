@@ -1,0 +1,13 @@
+node_modules
+.next
+.nuxt
+.output
+dist
+coverage
+.env
+.env.*
+!.env.example
+*.log
+prisma/dev.db
+
+.tools
