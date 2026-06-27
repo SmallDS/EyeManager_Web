@@ -8,6 +8,9 @@ export default defineNuxtConfig({
   experimental: {
     appManifest: false,
   },
+  build: {
+    transpile: ["element-plus"],
+  },
   vite: {
     optimizeDeps: {
       include: ["element-plus", "@element-plus/icons-vue"],
