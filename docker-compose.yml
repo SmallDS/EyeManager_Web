@@ -2,8 +2,8 @@ version: '3.8'
 
 services:
   app:
-    # 直接拉取 GitHub Actions 在 GHCR 上构建好的镜像
-    image: ghcr.io/smallds/eyemanager_web:latest
+    # 直接拉取 GitHub Actions 在 Docker Hub 上构建好的镜像
+    image: smallds2004/eyemanager-web:latest
     container_name: eyemanager-app
     restart: always
     ports:
