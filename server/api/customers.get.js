@@ -6,36 +6,43 @@ export default defineEventHandler(async (event) => {
   const queryParams = getQuery(event);
   const query = String(queryParams.q || "").trim();
   const take = Math.min(Number(queryParams.take || 100), 100);
+  const skip = Math.max(Number(queryParams.skip || 0), 0);
 
-  const customers = await prisma.customer.findMany({
-    where: {
-      tenantId: tenant.id,
-      ...(query
-        ? {
-            OR: [
-              { name: { contains: query, mode: "insensitive" } },
-              { primaryPhone: { contains: query } },
-              { secondaryPhone: { contains: query } },
-              { sourceCustomerId: { contains: query } },
-              { pinyin: { contains: query, mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: { updatedAt: "desc" },
-    take,
-    select: {
-      id: true,
-      name: true,
-      gender: true,
-      primaryPhone: true,
-      secondaryPhone: true,
-      note: true,
-      updatedAt: true,
-      _count: { select: { optometryExams: true } },
-    },
-  });
+  const whereClause = {
+    tenantId: tenant.id,
+    ...(query
+      ? {
+          OR: [
+            { name: { contains: query, mode: "insensitive" } },
+            { primaryPhone: { contains: query } },
+            { secondaryPhone: { contains: query } },
+            { sourceCustomerId: { contains: query } },
+            { pinyin: { contains: query, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
 
-  return { tenant, customers };
+  const [customers, total] = await Promise.all([
+    prisma.customer.findMany({
+      where: whereClause,
+      orderBy: { updatedAt: "desc" },
+      take,
+      skip,
+      select: {
+        id: true,
+        name: true,
+        gender: true,
+        primaryPhone: true,
+        secondaryPhone: true,
+        note: true,
+        updatedAt: true,
+        _count: { select: { optometryExams: true } },
+      },
+    }),
+    prisma.customer.count({ where: whereClause }),
+  ]);
+
+  return { tenant, customers, total };
 });
 

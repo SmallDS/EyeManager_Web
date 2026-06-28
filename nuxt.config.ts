@@ -13,7 +13,7 @@ export default defineNuxtConfig({
   },
   vite: {
     optimizeDeps: {
-      include: ["element-plus", "@element-plus/icons-vue"],
+      include: ["dayjs", "dayjs/plugin/*", "element-plus", "@element-plus/icons-vue"],
     },
   },
 });
