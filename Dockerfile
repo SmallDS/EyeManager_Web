@@ -18,8 +18,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY prisma ./prisma
 
 # 安装全部依赖
-# 注意：使用 --frozen-lockfile 确保与锁文件严格一致
-RUN pnpm install --frozen-lockfile
+# 使用 --no-frozen-lockfile：锁文件由 Windows 生成，Docker (Linux) 需重新解析原生二进制平台
+RUN pnpm install --no-frozen-lockfile
 
 # 生成适配 Linux 平台的 Prisma Client 二进制
 RUN pnpm prisma generate
