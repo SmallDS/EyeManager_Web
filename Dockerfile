@@ -1,41 +1,33 @@
 # ===== 阶段 1: 构建 =====
-FROM node:20-slim AS builder
+# 使用完整 node:20 镜像（已内置 python3、make、g++、openssl 等所有原生模块编译工具链）
+FROM node:20 AS builder
 
 WORKDIR /app
 
-# 安装系统依赖：
-# - openssl: Prisma query engine 必须
-# - python3 / make / g++: esbuild、@parcel/watcher 等原生模块编译所需
-RUN apt-get update -y && \
-    apt-get install -y openssl python3 make g++ && \
-    rm -rf /var/lib/apt/lists/*
+# 使用 corepack 激活与 package.json packageManager 字段完全一致的 pnpm 版本
+RUN corepack enable && corepack prepare pnpm@11.5.3 --activate
 
-# 安装与 package.json 中 packageManager 字段一致的 pnpm 版本
-RUN npm install -g pnpm@11.5.3
-
-# 先复制依赖配置文件（利用 Docker 层缓存，依赖未变时跳过此步）
+# 先复制依赖配置（利用 Docker 层缓存加速重复构建）
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY prisma ./prisma
 
-# 安装全部依赖
-# 使用 --no-frozen-lockfile：锁文件由 Windows 生成，Docker (Linux) 需重新解析原生二进制平台
+# 安装依赖（跨平台构建时不锁定 lockfile，允许 Linux 平台重新解析原生二进制）
 RUN pnpm install --no-frozen-lockfile
 
-# 生成适配 Linux 平台的 Prisma Client 二进制
+# 生成适配 Linux 平台的 Prisma Client
 RUN pnpm prisma generate
 
-# 复制全部源代码
+# 复制全量源码并构建 Nuxt standalone 生产包
 COPY . .
-
-# 编译 Nuxt 3 standalone 生产包（输出到 .output/）
 RUN pnpm run build
 
 # ===== 阶段 2: 运行 =====
+# 运行阶段使用 slim 镜像保持体积轻量
 FROM node:20-slim AS runner
 
 WORKDIR /app
 
-# 运行时同样需要 openssl（Prisma 运行依赖）
+# 仅需 openssl（Prisma 运行时依赖）
 RUN apt-get update -y && \
     apt-get install -y openssl && \
     rm -rf /var/lib/apt/lists/*
@@ -44,7 +36,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
 
-# 只复制生产运行所需的产物
+# 从构建阶段复制生产运行所需的产物
 COPY --from=builder /app/.output /app/.output
 COPY --from=builder /app/prisma /app/prisma
 COPY --from=builder /app/node_modules /app/node_modules
@@ -54,4 +46,3 @@ EXPOSE 3000
 
 # 启动时自动同步数据库 schema，再启动 Web 服务
 CMD ["sh", "-c", "node_modules/.bin/prisma db push && node .output/server/index.mjs"]
-
