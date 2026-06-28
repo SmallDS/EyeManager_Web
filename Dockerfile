@@ -1,10 +1,10 @@
 # ===== 阶段 1: 构建 =====
-FROM node:20 AS builder
+FROM node:22 AS builder
 
 WORKDIR /app
 
 # 使用 npm 全局安装 pnpm（稳定可靠，无需 corepack 联网下载）
-RUN npm install -g pnpm@10
+RUN npm install -g pnpm@11.5.3
 
 # 复制全部源文件（.dockerignore 已排除 node_modules/.git/.output 等）
 COPY . .
@@ -22,7 +22,8 @@ RUN pnpm prisma generate
 RUN pnpm run build
 
 # ===== 阶段 2: 运行 =====
-FROM node:20-slim AS runner
+# 运行阶段使用 slim 镜像保持体积轻量
+FROM node:22-slim AS runner
 
 WORKDIR /app
 
