@@ -1,6 +1,20 @@
 import { readFile } from "node:fs/promises";
-import { parseCsv } from "./csv.mjs";
+import { parseCsvDocument } from "./csv.mjs";
 import { summarizeImport } from "./importRules.mjs";
+
+const REQUIRED_CUSTOMER_HEADERS = ["c_id", "c_name", "dt_dt"];
+const REQUIRED_OPTOMETRY_HEADERS = ["c_id", "dt_dt"];
+const PREVIEW_ISSUE_LIMIT = 20;
+
+export class CsvImportValidationError extends Error {
+  constructor(messages) {
+    super(messages.join("；"));
+    this.name = "CsvImportValidationError";
+    this.statusCode = 400;
+    this.statusMessage = this.message;
+    this.messages = messages;
+  }
+}
 
 export async function loadCsvImport(customerFile, optometryFile) {
   const [customerText, optometryText] = await Promise.all([
@@ -11,7 +25,47 @@ export async function loadCsvImport(customerFile, optometryFile) {
 }
 
 export function loadCsvImportFromText(customerText, optometryText) {
-  return summarizeImport(parseCsv(customerText), parseCsv(optometryText));
+  const customerDocument = parseCsvDocument(customerText);
+  const optometryDocument = parseCsvDocument(optometryText);
+  validateCsvHeaders(customerDocument.headers, REQUIRED_CUSTOMER_HEADERS, "顾客 CSV");
+  validateCsvHeaders(optometryDocument.headers, REQUIRED_OPTOMETRY_HEADERS, "验光 CSV");
+  return summarizeImport(customerDocument.records, optometryDocument.records);
+}
+
+export function previewCsvImportFromText(customerText, optometryText) {
+  return buildImportPreview(loadCsvImportFromText(customerText, optometryText));
+}
+
+export function buildImportPreview(summary) {
+  const issues = [...summary.customerIssues, ...summary.optometryIssues];
+  return {
+    customerRows: summary.customerRows,
+    importedCustomers: summary.importedCustomers,
+    optometryRows: summary.optometryRows,
+    importedOptometry: summary.importedOptometry,
+    skippedOptometry: summary.skippedOptometry,
+    warningCount: summary.warningCount,
+    errorCount: summary.errorCount,
+    firstIssues: issues.slice(0, PREVIEW_ISSUE_LIMIT).map(toPublicIssue),
+  };
+}
+
+function validateCsvHeaders(headers, requiredHeaders, label) {
+  const headerSet = new Set(headers);
+  const missingHeaders = requiredHeaders.filter((header) => !headerSet.has(header));
+  if (missingHeaders.length > 0) {
+    throw new CsvImportValidationError([`${label} 缺少必需列：${missingHeaders.join(", ")}`]);
+  }
+}
+
+function toPublicIssue(issue) {
+  return {
+    level: issue.level,
+    entity: issue.entity,
+    sourceId: issue.sourceId,
+    rowNumber: issue.rowNumber,
+    message: issue.message,
+  };
 }
 
 export async function importCsvFiles(prisma, tenant, customerFile, optometryFile) {
@@ -32,6 +86,10 @@ export async function importCsvTexts(prisma, tenant, customerText, optometryText
 
 export async function startCsvImportFromTexts(prisma, tenant, customerText, optometryText, options = {}) {
   const summary = loadCsvImportFromText(customerText, optometryText);
+  return startCsvImportFromSummary(prisma, tenant, summary, options);
+}
+
+export async function startCsvImportFromSummary(prisma, tenant, summary, options = {}) {
   const batch = await createImportBatch(prisma, tenant, summary, {
     customerFile: options.customerFile || "uploaded-customer.csv",
     optometryFile: options.optometryFile || "uploaded-optometry.csv",
@@ -80,7 +138,6 @@ async function processImportBatch(prisma, tenant, batch, summary) {
           gender: customer.gender,
           pinyin: customer.pinyin,
           primaryPhone: customer.primaryPhone,
-          secondaryPhone: customer.secondaryPhone,
           note: customer.note,
           sourceCreatedAt: customer.sourceCreatedAt,
           rawRow: customer.rawRow,

@@ -102,20 +102,15 @@ export function transformCustomer(row) {
   appendNote(notes, row.c_addr);
 
   const primaryCandidate = clean(row.c_passno);
-  const secondaryCandidate = clean(row.c_tele);
+  const teleCandidate = clean(row.c_tele);
   const primaryPhone = MOBILE_RE.test(primaryCandidate) ? primaryCandidate : null;
-  let secondaryPhone = null;
 
   if (primaryCandidate && !primaryPhone) {
     appendNote(notes, `原c_passno: ${primaryCandidate}`);
   }
 
-  if (secondaryCandidate && secondaryCandidate !== primaryCandidate) {
-    if (MOBILE_RE.test(secondaryCandidate)) {
-      secondaryPhone = secondaryCandidate;
-    } else {
-      appendNote(notes, `原c_tele: ${secondaryCandidate}`);
-    }
+  if (teleCandidate && teleCandidate !== primaryCandidate) {
+    appendNote(notes, `原c_tele: ${teleCandidate}`);
   }
 
   const issues = [];
@@ -140,7 +135,6 @@ export function transformCustomer(row) {
       gender: clean(row.c_sex) || null,
       pinyin: clean(row.c_py) || generatePinyinCode(resolvedName) || null,
       primaryPhone,
-      secondaryPhone,
       note: notes.join("\n") || null,
       sourceCreatedAt: normalizeDate(row.dt_dt),
       rawRow: row,

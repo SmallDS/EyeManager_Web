@@ -4,7 +4,7 @@ import { parseCsv } from "../src/lib/csv.mjs";
 import { summarizeImport, transformCustomer, transformOptometry } from "../src/lib/importRules.mjs";
 import { loadCsvImportFromText } from "../src/lib/importService.js";
 
-test("customer import maps c_addr to note and ignores unused fields", () => {
+test("customer import maps c_addr and c_tele to note and ignores unused fields", () => {
   const row = {
     __rowNumber: 2,
     c_id: "0001",
@@ -24,9 +24,10 @@ test("customer import maps c_addr to note and ignores unused fields", () => {
     dt_dt: "2020-01-01 00:00:00.000000",
   };
   const result = transformCustomer(row).data;
-  assert.equal(result.note, "老客户");
+  assert.match(result.note, /老客户/);
   assert.equal(result.primaryPhone, "13800138000");
-  assert.equal(result.secondaryPhone, "13900139000");
+  assert.equal(Object.hasOwn(result, "secondaryPhone"), false);
+  assert.match(result.note, /原c_tele: 13900139000/);
   assert.equal(result.rawRow.c_work, "不应进入");
   assert.equal(Object.hasOwn(result, "c_work"), false);
 });
@@ -127,4 +128,14 @@ test("uploaded csv text uses the same import summary rules", () => {
   assert.equal(summary.importedCustomers, 1);
   assert.equal(summary.importedOptometry, 1);
   assert.equal(summary.skippedOptometry, 1);
+});
+
+test("uploaded csv text validates required headers before import", () => {
+  assert.throws(
+    () => loadCsvImportFromText(
+      "c_name,dt_dt\n张三,2020-01-01 00:00:00.000000\n",
+      "c_id,dt_dt,c_rf1\n0001,2020-01-02 00:00:00.000000,-1.00\n",
+    ),
+    /顾客 CSV 缺少必需列：c_id/,
+  );
 });

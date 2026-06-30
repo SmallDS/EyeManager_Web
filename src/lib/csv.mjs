@@ -3,6 +3,10 @@ export function stripBom(text) {
 }
 
 export function parseCsv(text) {
+  return parseCsvDocument(text).records;
+}
+
+export function parseCsvDocument(text) {
   const source = stripBom(text);
   const rows = [];
   let row = [];
@@ -55,17 +59,19 @@ export function parseCsv(text) {
   }
 
   if (rows.length === 0) {
-    return [];
+    return { headers: [], records: [] };
   }
 
   const headers = rows[0];
-  return rows.slice(1).filter((values) => values.some((value) => value !== "")).map((values, index) => {
+  const records = rows.slice(1).filter((values) => values.some((value) => value !== "")).map((values, index) => {
     const record = { __rowNumber: index + 2 };
     headers.forEach((header, headerIndex) => {
       record[header] = values[headerIndex] ?? "";
     });
     return record;
   });
+
+  return { headers, records };
 }
 
 export function toCsv(records) {

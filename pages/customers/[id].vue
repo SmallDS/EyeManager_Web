@@ -5,6 +5,7 @@ import { Delete, Plus } from "@element-plus/icons-vue";
 const route = useRoute();
 const customerId = computed(() => String(route.params.id));
 const requestHeaders = import.meta.server ? useRequestHeaders(["cookie"]) : undefined;
+const pageSizeOptions = [20, 30, 50];
 
 const { data, pending, refresh } = await useAsyncData(
   () => `customer-${customerId.value}`,
@@ -15,13 +16,17 @@ const { data, pending, refresh } = await useAsyncData(
 const form = reactive({
   name: "",
   primaryPhone: "",
-  secondaryPhone: "",
   gender: "",
   note: "",
 });
 const activeExamIds = ref([]);
 const savingCustomer = ref(false);
 const creatingExam = ref(false);
+const customerListLocation = computed(() => ({
+  path: "/",
+  query: getListQueryFromRoute(),
+  hash: "#customers",
+}));
 
 watch(
   () => data.value?.customer,
@@ -29,7 +34,6 @@ watch(
     if (!customer) return;
     form.name = customer.name || "";
     form.primaryPhone = customer.primaryPhone || "";
-    form.secondaryPhone = customer.secondaryPhone || "";
     form.gender = customer.gender || "";
     form.note = customer.note || "";
     activeExamIds.value = customer.optometryExams?.[0]?.id ? [customer.optometryExams[0].id] : [];
@@ -43,6 +47,32 @@ function formatExamDate(value) {
     month: "long",
     day: "numeric",
   });
+}
+
+function getQueryValue(value) {
+  if (Array.isArray(value)) return value[0] || "";
+  return value || "";
+}
+
+function getPositiveNumber(value) {
+  const number = Number.parseInt(getQueryValue(value), 10);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function getListQueryFromRoute() {
+  const query = {};
+  const q = getQueryValue(route.query.q).trim();
+  const page = getPositiveNumber(route.query.page);
+  const pageSize = getPositiveNumber(route.query.pageSize);
+
+  if (q) query.q = q;
+  if (page) query.page = String(page);
+  if (pageSizeOptions.includes(pageSize)) query.pageSize = String(pageSize);
+  return query;
+}
+
+async function goCustomerList() {
+  await navigateTo(customerListLocation.value);
 }
 
 async function saveCustomer() {
@@ -67,7 +97,7 @@ async function deleteCustomer() {
   });
   await $fetch(`/api/customers/${customerId.value}`, { method: "DELETE" });
   ElMessage.success("顾客已删除");
-  await navigateTo({ path: "/", hash: "#customers" });
+  await goCustomerList();
 }
 
 async function createExam() {
@@ -108,11 +138,11 @@ async function deleteExam(id) {
     <section class="page-head">
       <div>
         <h1>{{ data?.customer?.name || "顾客详情" }}</h1>
-        <p>{{ data?.customer?.primaryPhone || data?.customer?.secondaryPhone || "暂无电话" }}</p>
+        <p>{{ data?.customer?.primaryPhone || "暂无电话" }}</p>
       </div>
       <div class="action-row">
         <el-button type="primary" :icon="Plus" :loading="creatingExam" @click="createExam">新增验光单</el-button>
-        <el-button @click="navigateTo({ path: '/', hash: '#customers' })">返回列表</el-button>
+        <el-button @click="goCustomerList">返回列表</el-button>
       </div>
     </section>
 
@@ -134,13 +164,8 @@ async function deleteExam(id) {
             </el-form-item>
           </el-col>
           <el-col :xs="24" :md="6">
-            <el-form-item label="主电话">
+            <el-form-item label="电话">
               <el-input v-model="form.primaryPhone" />
-            </el-form-item>
-          </el-col>
-          <el-col :xs="24" :md="6">
-            <el-form-item label="备用电话">
-              <el-input v-model="form.secondaryPhone" />
             </el-form-item>
           </el-col>
           <el-col :xs="24" :md="6">

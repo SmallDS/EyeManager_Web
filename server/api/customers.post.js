@@ -17,7 +17,6 @@ export default defineEventHandler(async (event) => {
       gender: cleanText(body?.gender),
       pinyin: generatePinyinCode(name) || null,
       primaryPhone: cleanText(body?.primaryPhone),
-      secondaryPhone: cleanText(body?.secondaryPhone),
       note: cleanText(body?.note),
       sourceCreatedAt: createdAt,
       rawRow: { source: "manual", createdAt: createdAt.toISOString() },

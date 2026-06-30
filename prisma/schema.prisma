@@ -135,7 +135,6 @@ model Customer {
   gender           String?
   pinyin           String?
   primaryPhone     String?
-  secondaryPhone   String?
   note             String?
   sourceCreatedAt  DateTime?
   rawRow           Json

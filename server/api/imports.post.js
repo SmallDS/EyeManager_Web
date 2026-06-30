@@ -1,5 +1,5 @@
 import { createError, readMultipartFormData, setResponseStatus } from "h3";
-import { clearBusinessData, startCsvImportFromTexts } from "~~/src/lib/importService.js";
+import { clearBusinessData, loadCsvImportFromText, startCsvImportFromSummary } from "~~/src/lib/importService.js";
 import { getTenant, prisma } from "../utils/auth.js";
 import { requireAdmin } from "../utils/auth.js";
 
@@ -22,6 +22,22 @@ function getFilePart(parts, name, label) {
   return part;
 }
 
+async function ensureNoRunningImport(tenant) {
+  const runningCount = await prisma.importBatch.count({
+    where: { tenantId: tenant.id, status: "RUNNING" },
+  });
+  if (runningCount > 0) {
+    throw createError({ statusCode: 409, message: "当前门店已有导入任务运行中，请完成后再操作" });
+  }
+}
+
+function toBadRequest(error) {
+  if (error?.statusCode === 400) {
+    return createError({ statusCode: 400, message: error.message });
+  }
+  return error;
+}
+
 export default defineEventHandler(async (event) => {
   await requireAdmin(event);
 
@@ -35,6 +51,22 @@ export default defineEventHandler(async (event) => {
   const customerFile = getFilePart(parts, "customerFile", "顾客 CSV");
   const optometryFile = getFilePart(parts, "optometryFile", "验光 CSV");
   const clearBeforeImport = getTextPart(parts, "clearBeforeImport") === "true";
+  const previewConfirmed = getTextPart(parts, "previewConfirmed") === "true";
+
+  if (!previewConfirmed) {
+    throw createError({ statusCode: 400, message: "请先完成导入预检并确认结果" });
+  }
+
+  await ensureNoRunningImport(tenant);
+
+  const customerText = new TextDecoder("utf-8").decode(customerFile.data);
+  const optometryText = new TextDecoder("utf-8").decode(optometryFile.data);
+  let summary;
+  try {
+    summary = loadCsvImportFromText(customerText, optometryText);
+  } catch (error) {
+    throw toBadRequest(error);
+  }
 
   if (clearBeforeImport) {
     const confirmation = getTextPart(parts, "confirmation");
@@ -44,11 +76,10 @@ export default defineEventHandler(async (event) => {
     await clearBusinessData(prisma, tenant);
   }
 
-  const batch = await startCsvImportFromTexts(
+  const batch = await startCsvImportFromSummary(
     prisma,
     tenant,
-    new TextDecoder("utf-8").decode(customerFile.data),
-    new TextDecoder("utf-8").decode(optometryFile.data),
+    summary,
     {
       customerFile: customerFile.filename,
       optometryFile: optometryFile.filename,

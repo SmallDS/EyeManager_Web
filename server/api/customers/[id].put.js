@@ -13,7 +13,6 @@ export default defineEventHandler(async (event) => {
     data: {
       name,
       primaryPhone: cleanText(body?.primaryPhone),
-      secondaryPhone: cleanText(body?.secondaryPhone),
       gender: cleanText(body?.gender),
       pinyin: generatePinyinCode(name) || null,
       note: cleanText(body?.note),

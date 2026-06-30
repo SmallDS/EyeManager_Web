@@ -15,7 +15,6 @@ export default defineEventHandler(async (event) => {
           OR: [
             { name: { contains: query, mode: "insensitive" } },
             { primaryPhone: { contains: query } },
-            { secondaryPhone: { contains: query } },
             { sourceCustomerId: { contains: query } },
             { pinyin: { contains: query, mode: "insensitive" } },
           ],
@@ -34,7 +33,6 @@ export default defineEventHandler(async (event) => {
         name: true,
         gender: true,
         primaryPhone: true,
-        secondaryPhone: true,
         note: true,
         updatedAt: true,
         _count: { select: { optometryExams: true } },
