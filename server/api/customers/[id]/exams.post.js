@@ -1,5 +1,5 @@
 import { createError } from "h3";
-import { getTenant, prisma } from "../../../utils/tenant.js";
+import { getTenant, prisma } from "../../../utils/auth.js";
 import { buildEmptyEyeGroup, buildEmptyPupilGroup, eyeRows } from "../../../utils/prescription.js";
 
 export default defineEventHandler(async (event) => {
@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
   });
 
   if (!customer) {
-    throw createError({ statusCode: 404, statusMessage: "顾客不存在" });
+    throw createError({ statusCode: 404, message: "顾客不存在" });
   }
 
   const createdAt = new Date();
@@ -33,4 +33,3 @@ export default defineEventHandler(async (event) => {
 
   return { tenant, exam };
 });
-

@@ -37,9 +37,10 @@ ENV HOST=0.0.0.0
 
 COPY --from=builder /app/.output /app/.output
 COPY --from=builder /app/prisma /app/prisma
+COPY --from=builder /app/scripts /app/scripts
 COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/package.json /app/package.json
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "node_modules/.bin/prisma db push && node .output/server/index.mjs"]
+CMD ["sh", "-c", "node_modules/.bin/prisma db push && node scripts/start.mjs"]

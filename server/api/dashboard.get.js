@@ -1,4 +1,4 @@
-import { getTenant, prisma } from "../utils/tenant.js";
+import { getTenant, prisma } from "../utils/auth.js";
 
 export default defineEventHandler(async (event) => {
   const tenant = await getTenant(event);

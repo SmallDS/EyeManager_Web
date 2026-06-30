@@ -4,10 +4,11 @@ import { Delete, Plus } from "@element-plus/icons-vue";
 
 const route = useRoute();
 const customerId = computed(() => String(route.params.id));
+const requestHeaders = import.meta.server ? useRequestHeaders(["cookie"]) : undefined;
 
 const { data, pending, refresh } = await useAsyncData(
   () => `customer-${customerId.value}`,
-  () => $fetch(`/api/customers/${customerId.value}`),
+  () => $fetch(`/api/customers/${customerId.value}`, { headers: requestHeaders }),
   { watch: [customerId] },
 );
 
@@ -66,7 +67,7 @@ async function deleteCustomer() {
   });
   await $fetch(`/api/customers/${customerId.value}`, { method: "DELETE" });
   ElMessage.success("顾客已删除");
-  await navigateTo("/customers");
+  await navigateTo({ path: "/", hash: "#customers" });
 }
 
 async function createExam() {
@@ -111,7 +112,7 @@ async function deleteExam(id) {
       </div>
       <div class="action-row">
         <el-button type="primary" :icon="Plus" :loading="creatingExam" @click="createExam">新增验光单</el-button>
-        <el-button @click="navigateTo('/customers')">返回列表</el-button>
+        <el-button @click="navigateTo({ path: '/', hash: '#customers' })">返回列表</el-button>
       </div>
     </section>
 

@@ -1,6 +1,8 @@
-import { getTenant, prisma } from "../utils/tenant.js";
+import { getTenant, prisma } from "../utils/auth.js";
+import { requireAdmin } from "../utils/auth.js";
 
 export default defineEventHandler(async (event) => {
+  await requireAdmin(event);
   const tenant = await getTenant(event);
   const batches = await prisma.importBatch.findMany({
     where: { tenantId: tenant.id },
@@ -11,4 +13,3 @@ export default defineEventHandler(async (event) => {
 
   return { tenant, batches };
 });
-

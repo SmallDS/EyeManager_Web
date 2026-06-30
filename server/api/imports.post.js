@@ -1,6 +1,7 @@
 import { createError, readMultipartFormData, setResponseStatus } from "h3";
 import { clearBusinessData, startCsvImportFromTexts } from "~~/src/lib/importService.js";
-import { assertAdminApiKey, getTenant, prisma } from "../utils/tenant.js";
+import { getTenant, prisma } from "../utils/auth.js";
+import { requireAdmin } from "../utils/auth.js";
 
 const CONFIRMATION_TEXT = "清空数据";
 
@@ -16,19 +17,19 @@ function getTextPart(parts, name) {
 function getFilePart(parts, name, label) {
   const part = getPart(parts, name);
   if (!part?.filename || !part?.data?.length) {
-    throw createError({ statusCode: 400, statusMessage: `请上传${label}` });
+    throw createError({ statusCode: 400, message: `请上传${label}` });
   }
   return part;
 }
 
 export default defineEventHandler(async (event) => {
-  assertAdminApiKey(event);
+  await requireAdmin(event);
 
   const tenant = await getTenant(event);
   const parts = await readMultipartFormData(event);
 
   if (!parts?.length) {
-    throw createError({ statusCode: 400, statusMessage: "请通过表单上传顾客 CSV 和验光 CSV" });
+    throw createError({ statusCode: 400, message: "请通过表单上传顾客 CSV 和验光 CSV" });
   }
 
   const customerFile = getFilePart(parts, "customerFile", "顾客 CSV");
@@ -38,7 +39,7 @@ export default defineEventHandler(async (event) => {
   if (clearBeforeImport) {
     const confirmation = getTextPart(parts, "confirmation");
     if (confirmation !== CONFIRMATION_TEXT) {
-      throw createError({ statusCode: 400, statusMessage: `请输入确认词：${CONFIRMATION_TEXT}` });
+      throw createError({ statusCode: 400, message: `请输入确认词：${CONFIRMATION_TEXT}` });
     }
     await clearBusinessData(prisma, tenant);
   }

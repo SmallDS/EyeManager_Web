@@ -31,7 +31,8 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users          User[]
+  userTenants    UserTenant[]
+  wxUserTenants  WxUserTenant[]
   customers      Customer[]
   optometryExams OptometryExam[]
   importBatches  ImportBatch[]
@@ -39,18 +40,91 @@ model Tenant {
 
 model User {
   id           String   @id @default(cuid())
-  tenantId     String
+  account      String   @unique
   name         String
   mobile       String?
   email        String?
-  passwordHash String?
+  passwordHash String
+  passwordSalt String
   role         UserRole @default(STAFF)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  userTenants UserTenant[]
+  sessions    Session[]
+}
+
+model UserTenant {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, tenantId])
   @@index([tenantId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model WxUser {
+  id         String   @id @default(cuid())
+  openId     String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  lastSeenAt DateTime @default(now())
+
+  wxUserTenants WxUserTenant[]
+  wxSessions    WxSession[]
+}
+
+model WxUserTenant {
+  id        String   @id @default(cuid())
+  wxUserId  String
+  tenantId  String
+  createdAt DateTime @default(now())
+
+  wxUser WxUser @relation(fields: [wxUserId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([wxUserId, tenantId])
+  @@index([tenantId])
+}
+
+model WxSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  wxUserId  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  wxUser WxUser @relation(fields: [wxUserId], references: [id], onDelete: Cascade)
+
+  @@index([wxUserId])
+  @@index([expiresAt])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
 }
 
 model Customer {

@@ -1,5 +1,5 @@
 import { createError } from "h3";
-import { getTenant, prisma } from "../../utils/tenant.js";
+import { getTenant, prisma } from "../../utils/auth.js";
 
 export default defineEventHandler(async (event) => {
   const tenant = await getTenant(event);
@@ -12,9 +12,8 @@ export default defineEventHandler(async (event) => {
   });
 
   if (!customer) {
-    throw createError({ statusCode: 404, statusMessage: "顾客不存在" });
+    throw createError({ statusCode: 404, message: "顾客不存在" });
   }
 
   return { tenant, customer };
 });
-

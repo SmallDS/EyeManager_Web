@@ -1,5 +1,5 @@
 import { createError, readBody } from "h3";
-import { cleanText, getTenant, prisma } from "../../utils/tenant.js";
+import { cleanText, getTenant, prisma } from "../../utils/auth.js";
 import { eyeRows, normalizeEyeGroup, normalizePupilGroup, parseExamDate } from "../../utils/prescription.js";
 
 export default defineEventHandler(async (event) => {
@@ -12,7 +12,7 @@ export default defineEventHandler(async (event) => {
   });
 
   if (!exam) {
-    throw createError({ statusCode: 404, statusMessage: "验光单不存在" });
+    throw createError({ statusCode: 404, message: "验光单不存在" });
   }
 
   const updated = await prisma.optometryExam.update({
@@ -30,4 +30,3 @@ export default defineEventHandler(async (event) => {
 
   return { tenant, exam: updated };
 });
-

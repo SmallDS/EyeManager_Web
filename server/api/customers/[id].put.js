@@ -1,5 +1,5 @@
 import { readBody } from "h3";
-import { cleanText, getTenant, prisma } from "../../utils/tenant.js";
+import { cleanText, getTenant, prisma } from "../../utils/auth.js";
 import { generatePinyinCode } from "../../utils/pinyin.js";
 
 export default defineEventHandler(async (event) => {

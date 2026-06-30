@@ -10,9 +10,9 @@ const customerFileList = ref([]);
 const optometryFileList = ref([]);
 const clearBeforeImport = ref(false);
 const confirmation = ref("");
-const adminApiKey = ref("");
 let pollTimer;
-const { data, pending, refresh } = await useAsyncData("imports", () => $fetch("/api/imports"));
+const requestHeaders = import.meta.server ? useRequestHeaders(["cookie"]) : undefined;
+const { data, pending, refresh } = await useAsyncData("imports", () => $fetch("/api/imports", { headers: requestHeaders }));
 
 const canImport = computed(() => {
   if (!customerFile.value || !optometryFile.value) return false;
@@ -20,7 +20,7 @@ const canImport = computed(() => {
 });
 
 function errorMessage(error) {
-  return error?.data?.statusMessage || error?.statusMessage || error?.message || "操作失败";
+  return error?.data?.message || error?.data?.statusMessage || error?.message || error?.statusMessage || "操作失败";
 }
 
 function setCustomerFile(uploadFile, uploadFiles) {
@@ -55,10 +55,6 @@ function replaceOptometryFile(files) {
   const file = files[0];
   optometryFile.value = file || null;
   optometryFileList.value = file ? [{ name: file.name, raw: file }] : [];
-}
-
-function headers() {
-  return adminApiKey.value ? { "x-api-key": adminApiKey.value } : {};
 }
 
 function hasRunningImport() {
@@ -106,7 +102,6 @@ async function runImport() {
 
     const result = await $fetch("/api/imports", {
       method: "POST",
-      headers: headers(),
       body: formData,
     });
     ElMessage.success(result?.message || "导入任务已开始");
@@ -190,9 +185,6 @@ function formatTime(value) {
           >
             <el-button :icon="Upload">选择验光文件</el-button>
           </el-upload>
-        </el-form-item>
-        <el-form-item label="管理 API Key">
-          <el-input v-model="adminApiKey" show-password placeholder="如后端配置 ADMIN_API_KEY，请填写" style="max-width: 360px" />
         </el-form-item>
         <el-form-item label="重导选项">
           <el-checkbox v-model="clearBeforeImport">导入前清空业务数据</el-checkbox>

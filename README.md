@@ -25,8 +25,9 @@
 |---|---|
 | 顾客档案管理 | 顾客列表、分页检索、新增、编辑、删除 |
 | 验光记录管理 | 每位顾客的历史验光单（远用/近用/瞳距数据）查阅与管理 |
-| 数据导入 | 通过浏览器上传顾客 CSV 和验光 CSV，后台异步批量导入并出具报告 |
-| 多租户隔离 | 所有数据按 Tenant 隔离，通过请求头 `x-tenant-code` 区分门店 |
+| 数据导入 | 管理员通过浏览器上传顾客 CSV 和验光 CSV，后台异步批量导入并出具报告 |
+| 多租户隔离 | 所有数据按门店 Tenant 隔离，后台按登录账号和门店分配控制访问 |
+| 权限管理 | 管理员维护门店、员工账号、小程序用户门店分配和微信小程序配置 |
 | 仪表盘 | 顾客总数、验光记录总数及最近活动快速概览 |
 
 ### 📱 微信小程序（配套）
@@ -34,7 +35,7 @@
 - 顾客档案详情查阅与验光单历史记录
 - 经典横屏模式查看验光大单据
 - 首页实时时钟卡片与搜索结果统计
-- **只读模式**，无新增/编辑/删除操作入口
+- 通过微信 `openid` 识别小程序用户，等待管理员分配门店后使用
 
 ---
 
@@ -56,7 +57,8 @@
 
 ```
 Tenant (门店租户)
-  ├── User (门店员工)
+  ├── UserTenant (员工门店分配)
+  ├── WxUserTenant (小程序用户门店分配)
   ├── Customer (顾客档案)
   │     ├── sourceCustomerId  (原始系统顾客 ID)
   │     ├── pinyin            (姓名拼音首字母，用于检索)
@@ -72,7 +74,7 @@ Tenant (门店租户)
 
 ## API 文档
 
-所有 API 均通过请求头 `x-tenant-code` 标识门店（默认 `main`），需要管理员操作的接口还需提供 `x-api-key`。
+后台 API 使用账密登录后的 httpOnly Cookie 会话鉴权。管理员可访问全部门店；员工只能访问已分配门店。小程序 API 使用小程序会话 token 和当前门店校验访问权限。
 
 ### 仪表盘
 | 方法 | 路径 | 说明 |
@@ -99,7 +101,7 @@ Tenant (门店租户)
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `GET` | `/api/imports` | 获取历次导入批次列表及状态 |
-| `POST` | `/api/imports` | 上传顾客/验光 CSV 文件触发导入（需 `x-api-key`） |
+| `POST` | `/api/imports` | 上传顾客/验光 CSV 文件触发导入（管理员） |
 | `DELETE` | `/api/admin/business-data` | 清空当前门店所有业务数据（需 `confirmation: "清空数据"`） |
 
 ---
@@ -119,7 +121,7 @@ cd EyeManager_Web
 
 ```bash
 cp .env.example .env
-# 编辑 .env 填入 PostgreSQL 连接串和管理员 API Key
+# 编辑 .env 填入 PostgreSQL 连接串和首个管理员账号密码
 ```
 
 `.env` 内容说明见 [环境变量说明](#环境变量说明)。
@@ -220,13 +222,7 @@ docker compose logs -f app
 
 ### 通过 API 导入
 
-```bash
-curl -X POST http://localhost:3000/api/imports \
-  -H "x-api-key: $ADMIN_API_KEY" \
-  -H "x-tenant-code: main" \
-  -F "customerFile=@t_customer.csv" \
-  -F "optometryFile=@t_optometry.csv"
-```
+浏览器后台登录后进入 **数据导入** 页面上传。导入接口使用管理员登录会话鉴权，不再使用 API Key。
 
 ### 通过命令行导入（Dry Run 预览）
 
@@ -255,7 +251,8 @@ curl -X DELETE http://localhost:3000/api/admin/business-data \
 | 变量名 | 必填 | 说明 | 示例 |
 |---|---|---|---|
 | `DATABASE_URL` | ✅ | PostgreSQL 数据库连接串 | `postgresql://postgres:pass@localhost:5432/eye_store?schema=public` |
-| `ADMIN_API_KEY` | ✅ | 管理员 API 鉴权 Key（用于数据导入、清空操作） | `your-secret-key` |
+| `ADMIN_ACCOUNT` | ✅ | 首个全局管理员账号，仅系统无管理员时自动创建 | `admin` |
+| `ADMIN_PASSWORD` | ✅ | 首个全局管理员密码，仅系统无管理员时自动创建 | `change-me` |
 
 > ⚠️ 请勿将 `.env` 文件提交到 Git 仓库，仓库中仅保留 `.env.example` 模板文件。
 

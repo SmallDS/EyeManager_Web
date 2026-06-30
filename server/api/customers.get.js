@@ -1,5 +1,5 @@
 import { getQuery } from "h3";
-import { getTenant, prisma } from "../utils/tenant.js";
+import { getTenant, prisma } from "../utils/auth.js";
 
 export default defineEventHandler(async (event) => {
   const tenant = await getTenant(event);
@@ -45,4 +45,3 @@ export default defineEventHandler(async (event) => {
 
   return { tenant, customers, total };
 });
-

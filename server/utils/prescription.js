@@ -1,4 +1,4 @@
-import { cleanText } from "./tenant.js";
+import { cleanText } from "./auth.js";
 
 export const prescriptionColumns = ["球光", "散光", "轴线", "三棱", "基底", "加光", "基弧V", "基弧H", "直径", "裸眼视力", "矫正视力"];
 
@@ -45,4 +45,3 @@ export function parseExamDate(value) {
   const text = cleanText(value);
   return text ? new Date(`${text}T00:00:00+08:00`) : new Date();
 }
-
