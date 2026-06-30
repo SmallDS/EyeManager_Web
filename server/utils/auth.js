@@ -142,14 +142,13 @@ async function ensureMainTenant() {
 
 function tenantSelector(event) {
   const query = getQuery(event);
-  return (
-    getHeader(event, "x-tenant-id") ||
-    getHeader(event, "x-tenant-code") ||
-    query.tenantId ||
-    query.tenant ||
-    getCookie(event, TENANT_COOKIE) ||
-    null
-  );
+  const headerSelector = getHeader(event, "x-tenant-id") || getHeader(event, "x-tenant-code");
+  if (headerSelector) return { value: headerSelector, source: "request" };
+  const querySelector = query.tenantId || query.tenant;
+  if (querySelector) return { value: querySelector, source: "request" };
+  const cookieSelector = getCookie(event, TENANT_COOKIE);
+  if (cookieSelector) return { value: cookieSelector, source: "cookie" };
+  return { value: null, source: "none" };
 }
 
 function matchTenant(tenant, selector) {
@@ -174,7 +173,10 @@ export async function requireTenantAccess(event) {
     throw createError({ statusCode: 403, message: "当前账号未分配门店" });
   }
 
-  const tenant = selector ? tenants.find((item) => matchTenant(item, selector)) : tenants[0];
+  let tenant = selector.value ? tenants.find((item) => matchTenant(item, selector.value)) : tenants[0];
+  if (!tenant && selector.source === "cookie") {
+    tenant = tenants[0];
+  }
   if (!tenant) {
     throw createError({ statusCode: 403, message: "无权访问该门店" });
   }
