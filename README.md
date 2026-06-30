@@ -23,12 +23,12 @@
 ### 🏪 Web 管理后台
 | 功能模块 | 说明 |
 |---|---|
-| 顾客档案管理 | 顾客列表、分页检索、新增、编辑、删除 |
+| 顾客档案管理 | 顾客列表、分页检索、新增、编辑、删除；首页搜索和分页状态会保留在 URL 中 |
 | 验光记录管理 | 每位顾客的历史验光单（远用/近用/瞳距数据）查阅与管理 |
-| 数据导入 | 管理员通过浏览器上传顾客 CSV 和验光 CSV，后台异步批量导入并出具报告 |
+| 数据导入 | 管理员上传顾客 CSV 和验光 CSV 后先预检，确认摘要和问题列表后再正式写入 |
 | 多租户隔离 | 所有数据按门店 Tenant 隔离，后台按登录账号和门店分配控制访问 |
 | 权限管理 | 管理员维护门店、员工账号、小程序用户门店分配和微信小程序配置 |
-| 仪表盘 | 顾客总数、验光记录总数及最近活动快速概览 |
+| 仪表盘 | 顾客总数、验光记录总数、最近更新顾客及最近验光记录快速概览 |
 
 ### 📱 微信小程序（配套）
 - 顾客列表浏览（支持分页、搜索防抖、触底翻页）
@@ -49,7 +49,7 @@
 | 数据库 | PostgreSQL 15+ |
 | 包管理器 | pnpm |
 | 容器化 | Docker (多阶段构建) + Docker Compose |
-| CI/CD | GitHub Actions + GHCR (GitHub Container Registry) |
+| CI/CD | GitHub Actions + Docker Hub |
 
 ---
 
@@ -60,6 +60,7 @@ Tenant (门店租户)
   ├── UserTenant (员工门店分配)
   ├── WxUserTenant (小程序用户门店分配)
   ├── Customer (顾客档案)
+  │     ├── primaryPhone       (顾客电话)
   │     ├── sourceCustomerId  (原始系统顾客 ID)
   │     ├── pinyin            (姓名拼音首字母，用于检索)
   │     └── OptometryExam (验光记录)
@@ -101,7 +102,8 @@ Tenant (门店租户)
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `GET` | `/api/imports` | 获取历次导入批次列表及状态 |
-| `POST` | `/api/imports` | 上传顾客/验光 CSV 文件触发导入（管理员） |
+| `POST` | `/api/imports/preview` | 预检顾客/验光 CSV，返回摘要和前 20 条问题，不写数据库 |
+| `POST` | `/api/imports` | 确认预检后上传顾客/验光 CSV 正式导入（管理员） |
 | `DELETE` | `/api/admin/business-data` | 清空当前门店所有业务数据（需 `confirmation: "清空数据"`） |
 
 ---
@@ -154,7 +156,7 @@ pnpm dev
 
 ## Docker 部署
 
-本项目支持通过 Docker Compose 以单条命令一键部署，直接拉取 GitHub Actions 在 GHCR 上自动构建的生产镜像，**无需在服务器上安装 Node.js 或执行编译**。
+本项目支持通过 Docker Compose 以单条命令一键部署，直接拉取 GitHub Actions 在 Docker Hub 上自动构建的生产镜像，**无需在服务器上安装 Node.js 或执行编译**。
 
 ### 1. 在服务器上创建部署目录
 
@@ -173,6 +175,8 @@ curl -O https://raw.githubusercontent.com/SmallDS/EyeManager_Web/main/docker-com
 ```bash
 cat > .env << 'EOF'
 DATABASE_URL="postgresql://用户名:密码@数据库主机:5432/数据库名?schema=public"
+ADMIN_ACCOUNT="admin"
+ADMIN_PASSWORD="请替换为强密码"
 EOF
 ```
 
@@ -191,6 +195,26 @@ docker compose logs -f app
 
 服务就绪后，即可通过 `http://服务器IP:3000` 访问后台管理界面。
 
+### 本地 Docker 测试示例
+
+如果 WSL 本机已经有 PostgreSQL 测试库，且库名、用户名、密码均为 `test`，可用下面命令构建并启动本地镜像：
+
+```bash
+docker build -t eyemanager-web:dev-local .
+
+docker rm -f eyemanager-web-dev 2>/dev/null || true
+docker run -d \
+  --name eyemanager-web-dev \
+  --add-host=host.docker.internal:host-gateway \
+  -p 3000:3000 \
+  -e DATABASE_URL="postgresql://test:test@host.docker.internal:5432/test?schema=public" \
+  -e ADMIN_ACCOUNT="admin" \
+  -e ADMIN_PASSWORD="admin" \
+  eyemanager-web:dev-local
+```
+
+`ADMIN_ACCOUNT` 和 `ADMIN_PASSWORD` 只在数据库中没有管理员时自动创建；如果测试库已有管理员，不会覆盖已有密码。若浏览器登录后无跳转，可先清理当前访问地址的站点数据/cookie，避免旧的门店 cookie 影响会话。
+
 ---
 
 ## GitHub Actions 自动构建
@@ -199,10 +223,10 @@ docker compose logs -f app
 
 1. 在 GitHub 提供的虚拟环境中拉取最新代码。
 2. 根据 `Dockerfile` 进行多阶段 Docker 镜像构建。
-3. 将构建好的镜像（含 `latest` 和 `sha-xxxxxxx` 两个 Tag）推送到 **GHCR**：
+3. 将构建好的镜像（含 `latest` 和 `sha-xxxxxxx` 两个 Tag）推送到 **Docker Hub**：
 
    ```
-   ghcr.io/smallds/eyemanager_web:latest
+   smallds2004/eyemanager-web:latest
    ```
 
 4. 服务器只需执行 `docker compose pull && docker compose up -d` 即可完成更新。
@@ -217,12 +241,13 @@ docker compose logs -f app
 
 1. 访问管理后台，进入 **数据导入** 页面。
 2. 选择 `顾客 CSV` 和 `验光 CSV` 上传。
-3. 支持勾选"导入前清空业务数据"（确认词：`清空数据`）。
-4. 提交后后台异步处理，页面自动刷新导入进度。
+3. 点击预检，系统会返回顾客行数、验光行数、可导入/跳过数量，以及前 20 条 WARNING/ERROR 问题。
+4. 确认预检结果后勾选确认项，再正式导入。
+5. 支持勾选"导入前清空业务数据"（确认词：`清空数据`）。若当前门店存在 `RUNNING` 导入批次，会禁止重复导入或清空数据。
 
 ### 通过 API 导入
 
-浏览器后台登录后进入 **数据导入** 页面上传。导入接口使用管理员登录会话鉴权，不再使用 API Key。
+浏览器后台登录后进入 **数据导入** 页面上传。导入接口使用管理员登录会话鉴权，不再使用 API Key。正式导入前需要先调用预检并在提交时带上确认标记。
 
 ### 通过命令行导入（Dry Run 预览）
 
@@ -265,9 +290,10 @@ pnpm test
 ```
 
 当前单元测试覆盖：
-- 顾客字段处理与手机号合并逻辑
+- 顾客字段处理与单一电话字段映射
 - 空姓名占位处理
 - 验光记录中文字段备注迁移
+- 导入中的历史备用电话字段写入备注
 - 孤立验光记录跳过处理
 - CSV BOM 头与引号特殊字符解析
 
