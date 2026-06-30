@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { hashPassword, maskSecret, verifyPassword } from "../src/lib/security.mjs";
+import { resolveTenantForSelector } from "../src/lib/tenantAccess.mjs";
 import {
   createAppIdMismatchResponse,
   createOpenIdMissingResponse,
@@ -83,4 +84,16 @@ test("wechat session result keeps invalid string responses for diagnostics", () 
 test("wechat upstream timeout message is actionable", () => {
   assert.equal(WX_SESSION_TIMEOUT_MS, 8000);
   assert.match(WX_SESSION_UPSTREAM_ERROR_MESSAGE, /api\.weixin\.qq\.com/);
+});
+
+test("tenant selector resolves by value and defaults when absent", () => {
+  const tenants = [
+    { id: "tenant-1", code: "main" },
+    { id: "tenant-2", code: "branch" },
+  ];
+
+  assert.equal(resolveTenantForSelector(tenants, { value: "tenant-2" }), tenants[1]);
+  assert.equal(resolveTenantForSelector(tenants, { value: "branch" }), tenants[1]);
+  assert.equal(resolveTenantForSelector(tenants, { value: null }), tenants[0]);
+  assert.equal(resolveTenantForSelector(tenants, { value: "missing" }), null);
 });

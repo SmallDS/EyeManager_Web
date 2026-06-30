@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createError, deleteCookie, getCookie, getHeader, getQuery, readBody, setCookie } from "h3";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword, maskSecret, verifyPassword } from "~~/src/lib/security.mjs";
+import { matchTenantSelector, resolveTenantForSelector } from "~~/src/lib/tenantAccess.mjs";
 
 const globalForPrisma = globalThis;
 
@@ -151,10 +152,6 @@ function tenantSelector(event) {
   return { value: null, source: "none" };
 }
 
-function matchTenant(tenant, selector) {
-  return tenant.id === selector || tenant.code === selector;
-}
-
 export async function getAvailableTenants(user) {
   if (isAdminRole(user.role)) {
     const tenants = await prisma.tenant.findMany({ orderBy: [{ createdAt: "asc" }, { name: "asc" }] });
@@ -173,7 +170,7 @@ export async function requireTenantAccess(event) {
     throw createError({ statusCode: 403, message: "当前账号未分配门店" });
   }
 
-  let tenant = selector.value ? tenants.find((item) => matchTenant(item, selector.value)) : tenants[0];
+  let tenant = resolveTenantForSelector(tenants, selector);
   if (!tenant && selector.source === "cookie") {
     tenant = tenants[0];
   }
@@ -199,7 +196,7 @@ export async function selectTenant(event) {
   }
   const user = await requireUser(event);
   const tenants = await getAvailableTenants(user);
-  const tenant = tenants.find((item) => matchTenant(item, selector));
+  const tenant = tenants.find((item) => matchTenantSelector(item, selector));
   if (!tenant) {
     throw createError({ statusCode: 403, message: "无权访问该门店" });
   }
@@ -272,7 +269,7 @@ export async function requireWxTenantAccess(event) {
   }
 
   const selector = tenantSelector(event);
-  const tenant = selector ? tenants.find((item) => matchTenant(item, selector)) : tenants[0];
+  const tenant = resolveTenantForSelector(tenants, selector);
   if (!tenant) {
     throw createError({ statusCode: 403, message: "无权访问该门店" });
   }
